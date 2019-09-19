@@ -1,26 +1,19 @@
-# Makefile, ECE252
-# Yiqing Huang
-
-CC = gcc       # compiler
-CFLAGS = -Wall -g -std=c99 # compilation flags
-LD = gcc       # linker
-LDFLAGS = -g   # debugging symbols in build
-LDLIBS = -lz   # link with libz
-
-# For students
-LIB_UTIL = zutil.o crc.o
-SRCS   = findpng.c crc.c zutil.c
-OBJS   = findpng.o $(LIB_UTIL)
-
-TARGETS= findpng.out
+SRCS   = png_info.c catpng.c crc.c zutil.c
+TARGETS= png_info catpng findpng
 
 all: ${TARGETS}
 
-findpng.out: $(OBJS)
-	$(LD) -o $@ $^ $(LDLIBS) $(LDFLAGS)
+png_info: png_info.o zutil.o crc.o
+	gcc -o $@ $^ -lz -g
+
+catpng: catpng.o zutil.o crc.o
+	gcc -o $@ $^ -lz -g
+
+findpng: findpng.o zutil.o crc.o
+	gcc -o $@ $^ -lz -g
 
 %.o: %.c
-	$(CC) $(CFLAGS) -c $<
+	gcc -Wall -g -std=c99 -c $<
 
 %.d: %.c
 	gcc -MM -MF $@ $<
