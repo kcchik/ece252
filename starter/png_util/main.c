@@ -35,19 +35,12 @@ void init_data(U8 *buf, int len);
  * FUNCTIONS
  *****************************************************************************/
 
-/**
- * @brief initialize memory with 256 chars 0 - 255 cyclically
- */
-void init_data(U8 *buf, int len)
-{
-    int i;
-    for ( i = 0; i < len; i++) {
-        buf[i] = i%256;
-    }
-}
-
 int main (int argc, char **argv)
 {
+    if (argc < 2) {
+        printf("Wrong number of arguments: given %d, expected 1\n", argc - 1);
+        return -1;
+    }
     FILE *fp = fopen(argv[1], "rb");
     if (fp == NULL) {
         printf("Unable to open file");
