@@ -11,7 +11,8 @@
  * INCLUDE HEADER FILES
  *****************************************************************************/
 #include <stdio.h>
-
+#include <dirent.h>
+#include <limits.h>
 /******************************************************************************
  * STRUCTURES and TYPEDEFS
  *****************************************************************************/
@@ -50,7 +51,12 @@ typedef struct simple_PNG {
 /******************************************************************************
  * FUNCTION PROTOTYPES
  *****************************************************************************/
-int is_png(FILE *fp) {
+int is_png(char *filePath) {
+    FILE *fp = fopen(filePath, "rb");
+    if (fp == NULL){
+        perror("fopen");
+        return errno;
+    }
     U8 *buf = malloc(8);
     fread(buf, sizeof(buf), 1, fp);
     if (
@@ -145,4 +151,37 @@ int validate_CRC(struct chunk *chunk) {
     }
     free(stream);
     return 1;
+}
+
+int list_dir(char *dirPath){
+    int count = 0;
+    struct dirent *entry;
+    DIR *dp;
+    char path[PATH_MAX + 1];
+
+    if (!(dp = opendir(dirPath))){
+        perror("opendir");
+        return errno;
+    }
+
+    while((entry = readdir(dp))!= NULL) {
+        strcpy(path, dirPath);
+        strcat(path, "/");
+        strcat(path, entry->d_name);
+
+        if (entry->d_type == DT_DIR) {
+            if (strcmp(entry->d_name, ".") != 0 && strcmp(entry->d_name, "..") != 0) {
+                count += list_dir(path);
+            }
+        }
+        else{
+            if (is_png(path)) {
+                count++;
+                printf("%s\n", path);
+                printf("%i\n", count);
+            }
+        }
+    }
+    closedir(dp);
+    return count;
 }
