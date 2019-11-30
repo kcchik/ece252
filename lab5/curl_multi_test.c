@@ -27,7 +27,6 @@ typedef struct {
   char *buf;       /* memory to hold a copy of received data */
   size_t size;     /* size of valid data in buf in bytes*/
   size_t max_size; /* max capacity of buf in bytes*/
-  int seq;         /* >=0 sequence number extracted from http header <0 indicates an invalid seq number */
 } RECV_BUF;
 
 int running = 1;
@@ -108,10 +107,7 @@ htmlDocPtr mem_getdoc(char *buf, int size, const char *url)
     htmlDocPtr doc = htmlReadMemory(buf, size, url, NULL, opts);
 
     if (doc == NULL) {
-        // strcpy(frontier[frontier_size], url);
-        // frontier_size++;
         fprintf(stderr, "Document not parsed successfully.\n");
-        printf("%s\n", url);
         return NULL;
     }
     return doc;
@@ -158,18 +154,6 @@ size_t write_cb(char *p_recv, size_t size, size_t nmemb, void *p_userdata)
     return realsize;
 }
 
-size_t header_cb(char *p_recv, size_t size, size_t nmemb, void *userdata)
-{
-    int realsize = size * nmemb;
-    RECV_BUF *p = userdata;
-
-    if (realsize > strlen(ECE252_HEADER) && strncmp(p_recv, ECE252_HEADER, strlen(ECE252_HEADER)) == 0) {
-        /* extract img sequence number */
-        p->seq = atoi(p_recv + strlen(ECE252_HEADER));
-    }
-    return realsize;
-}
-
 int recv_buf_init(RECV_BUF *ptr, size_t max_size)
 {
     void *p = NULL;
@@ -186,7 +170,6 @@ int recv_buf_init(RECV_BUF *ptr, size_t max_size)
     ptr->buf = p;
     ptr->size = 0;
     ptr->max_size = max_size;
-    ptr->seq = -1;              /* valid seq should be positive */
     return 0;
 }
 
@@ -196,11 +179,9 @@ static void init(CURLM *cm, RECV_BUF *ptr)
     recv_buf_init(ptr, BUF_SIZE);
     curl_easy_setopt(eh, CURLOPT_WRITEFUNCTION, write_cb);
     curl_easy_setopt(eh, CURLOPT_WRITEDATA, (void *)ptr);
-    curl_easy_setopt(eh, CURLOPT_HEADERFUNCTION, header_cb);
-    curl_easy_setopt(eh, CURLOPT_HEADERDATA, (void *)ptr);
     curl_easy_setopt(eh, CURLOPT_HEADER, 0L);
     curl_easy_setopt(eh, CURLOPT_URL, frontier[frontier_size - 1]);
-    curl_easy_setopt(eh, CURLOPT_PRIVATE, frontier[frontier_size - 1]);
+    curl_easy_setopt(eh, CURLOPT_PRIVATE, (void *)ptr);
     curl_easy_setopt(eh, CURLOPT_VERBOSE, 0L);
     curl_multi_add_handle(cm, eh);
 
@@ -313,7 +294,6 @@ int process_data(CURL *curl_handle, RECV_BUF *p_recv_buf) {
         return 1;
     }
 
-
     if (l) {
         char *eurl = NULL;
         curl_easy_getinfo(curl_handle, CURLINFO_EFFECTIVE_URL, &eurl);
@@ -404,7 +384,10 @@ int main(int argc, char** argv)
         while ((msg = curl_multi_info_read(cm, &msgs_left))) {
             eh = msg->easy_handle;
 
-            if (process_data(eh, &recv_buf[j]) == -4) {
+            RECV_BUF *buf;
+            curl_easy_getinfo(eh, CURLINFO_PRIVATE, &buf);
+
+            if (process_data(eh, buf) == -4) {
                 curl_multi_remove_handle(cm, eh);
                 curl_easy_cleanup(eh);
                 running = 0;
